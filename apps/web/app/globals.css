@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: <html class="dark"> set by ThemeToggle / no-flash script */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Palette sampled from platform_theme_template.png */
+@theme {
+  --color-cream-50: #fbf4e3;
+  --color-cream-100: #f6ecd5;
+  --color-cream-200: #eadcbc;
+  --color-forest-500: #2f6b58;
+  --color-forest-600: #1d5244;
+  --color-forest-700: #134536;
+  --color-forest-800: #0e372d;
+  --color-forest-900: #0a2a22;
+  --color-terracotta-400: #e57a45;
+  --color-terracotta-500: #d35826;
+  --color-terracotta-600: #b8471b;
+  --color-ink: #1c2321;
+  --color-muted: #5d6763;
+  --color-line: #e8dcc2;
+
+  --color-severity-high: #c2410c;
+  --color-severity-medium: #b7791f;
+  --color-severity-low: #4d7c6f;
+  --color-success: #1f8a4c;
+  --color-danger: #c53030;
+}
+
+/* inline: next/font sets these vars on <body>, so they must resolve at the use site, not :root */
+@theme inline {
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
+}
+
+/* Frosted glass surface used across marketing + app */
+@utility glass {
+  background: rgb(255 255 255 / 0.55);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: 0 10px 40px -12px rgb(14 55 45 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.8);
+}
+
+/* Painted scene, blurred, behind app glass surfaces */
+@utility scenic {
+  background:
+    linear-gradient(rgb(251 244 227 / 0.72), rgb(251 244 227 / 0.86)),
+    url("/art/scene-blur.jpg") center / cover fixed;
+}
+
+/* Feather cropped template art into the page so no rectangle edges show */
+@utility fade-l {
+  mask-image: linear-gradient(to right, black 55%, transparent), linear-gradient(to bottom, transparent, black 12%, black 85%, transparent);
+  mask-composite: intersect;
+}
+@utility fade-r {
+  mask-image: linear-gradient(to left, black 55%, transparent), linear-gradient(to bottom, transparent, black 12%, black 85%, transparent);
+  mask-composite: intersect;
+}
+@utility fade-t {
+  mask-image: linear-gradient(to bottom, transparent, black 45%), linear-gradient(to right, black 70%, transparent);
+  mask-composite: intersect;
+}
+
+/* Night palette: flipping the tokens re-themes every utility that uses them */
+.dark {
+  color-scheme: dark;
+  --color-cream-50: #08130f;
+  --color-cream-100: #0e1d18;
+  --color-cream-200: #1a2e27;
+  --color-forest-500: #6cc09a;
+  --color-forest-600: #86cfae;
+  --color-forest-700: #a6ddc3;
+  --color-forest-800: #e3f1e8;
+  --color-terracotta-400: #f39a67;
+  --color-terracotta-500: #f07c45;
+  --color-terracotta-600: #e0673a;
+  --color-ink: #e9efe9;
+  --color-muted: #9db0a7;
+  --color-line: #22362e;
+  --color-white: #12221d;
+  --color-success: #4ade80;
+  --color-danger: #f87171;
+}
+
+.dark .glass {
+  background: rgb(14 29 24 / 0.55);
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 10px 40px -12px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.dark .scenic {
+  background:
+    linear-gradient(rgb(8 19 15 / 0.82), rgb(8 19 15 / 0.92)),
+    url("/art/scene-blur.jpg") center / cover fixed;
+}
+
+/* Painted art turns to moonlight in dark mode */
+.art {
+  transition: filter 0.6s ease;
+}
+.dark .art {
+  filter: brightness(0.55) saturate(0.75) contrast(1.05);
+}
+
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+  scroll-padding-top: 5.5rem; /* anchors land below the pinned header */
+}
+
+body {
+  background: var(--color-cream-50);
+  color: var(--color-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  transition: background-color 0.6s ease, color 0.6s ease;
+}
+
+/* Fireflies: drift on a wandering path while the glow pulses */
+@keyframes firefly-drift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(var(--dx), calc(var(--dy) * -1)); }
+  50% { transform: translate(calc(var(--dx) * -0.6), var(--dy)); }
+  75% { transform: translate(calc(var(--dx) * 0.8), calc(var(--dy) * 0.5)); }
+}
+@keyframes firefly-glow {
+  0%, 100% { opacity: 0.15; }
+  45%, 60% { opacity: 1; }
+}
+.firefly {
+  position: absolute;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #fffbd1 0%, #ffe066 45%, #f5b82e 100%);
+  box-shadow: 0 0 6px 2px rgb(255 226 110 / 0.85), 0 0 18px 6px rgb(255 196 60 / 0.35);
+  animation: firefly-drift var(--drift) ease-in-out infinite, firefly-glow var(--pulse) ease-in-out infinite;
+  animation-delay: var(--delay), var(--delay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* static, softly lit fireflies instead of 0.01ms strobing */
+  .firefly {
+    animation: none !important;
+    opacity: 0.6;
+  }
+}
