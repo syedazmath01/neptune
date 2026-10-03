@@ -1,6 +1,6 @@
 import "server-only";
 
-type Step = "generate-prompts" | "run-chatgpt-batch" | "analyze-gaps" | "run-measurement";
+type Step = "generate-prompts" | "run-engine-batch" | "analyze-gaps" | "run-measurement";
 
 // Kicks off a Supabase Edge Function pipeline step; it replies 202 and works in the background.
 export async function runPipeline(step: Step, body: Record<string, unknown>) {

@@ -8,6 +8,8 @@ export type CompanyProfile = {
   domain: string;
   industry: string;
   products: string;
+  /** Goal + pain point from onboarding; steers which questions get asked. */
+  goals: string;
   competitors: { name: string; domain: string }[];
 };
 
@@ -16,10 +18,11 @@ export function promptGenerationMessages(c: CompanyProfile) {
     {
       role: "system" as const,
       content:
-        "You generate realistic questions that potential buyers type into ChatGPT when researching products. " +
+        "You generate realistic questions that potential buyers ask AI assistants (ChatGPT, Grok) when researching products. " +
         'Return JSON: {"prompts":[{"text":string,"category":one of ' + CATEGORIES.join("|") + "}]}. " +
         "Write 50 unique prompts, roughly 10 per category. Natural phrasing, no brand name of the target company " +
-        "except in comparison/competitive prompts. Each prompt under 150 characters.",
+        "except in comparison/competitive prompts. Each prompt under 150 characters. " +
+        "Favor questions tied to the company's stated goals and pain points, when given.",
     },
     {
       role: "user" as const,
@@ -28,6 +31,7 @@ export function promptGenerationMessages(c: CompanyProfile) {
         website: c.domain,
         industry: c.industry,
         product: c.products,
+        goals: c.goals,
         competitors: c.competitors.map((x) => `${x.name} (${x.domain})`),
       }),
     },

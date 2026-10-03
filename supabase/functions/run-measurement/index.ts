@@ -22,6 +22,6 @@ pipelineStep("run-measurement", async (body) => {
     // Due = its 14-day window has passed and no round has started since then.
     const pending = recs.filter((r) => Date.parse(r.implemented_at) + WAIT_MS > lastStart);
     if (!pending.length || last?.status === "running" || last?.status === "pending") continue;
-    await chain("run-chatgpt-batch", { company_id: companyId, triggered_by_recommendation_id: pending[0].id });
+    await chain("run-engine-batch", { company_id: companyId, triggered_by_recommendation_id: pending[0].id });
   }
 });

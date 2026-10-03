@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
-import { requireCompany } from "@/lib/company";
+import { getUser, requireCompany } from "@/lib/company";
+import { Sidebar } from "@/components/dashboard/Sidebar";
+import { TopBar } from "@/components/dashboard/TopBar";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
-import { Sidebar } from "@/components/dashboard/Sidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const company = await requireCompany();
+  const [company, user] = await Promise.all([requireCompany(), getUser()]);
 
   return (
     <div className="scenic min-h-screen lg:flex">
       <Sidebar companyName={company.name} domain={company.domain} />
-      <main className="flex-1 px-4 py-8 md:px-8 lg:px-12 lg:py-10">{children}</main>
+      <main className="min-w-0 flex-1 px-4 py-6 md:px-8 lg:px-12 lg:py-8">
+        <TopBar company={company} name={(user.user_metadata?.full_name as string | undefined) || null} email={user.email ?? ""} />
+        {children}
+      </main>
     </div>
   );
 }

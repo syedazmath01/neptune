@@ -21,12 +21,12 @@ export const metadata: Metadata = {
     url: "/",
     siteName: SITE_NAME,
     title: "Neptune by 99sols.ai | AI Visibility Optimization Platform",
-    description: "Track, diagnose, and grow your brand's presence in AI answers, starting with ChatGPT.",
+    description: "Track, diagnose, and grow your brand's presence in AI answers, starting with Grok.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Neptune by 99sols.ai | AI Visibility Optimization Platform",
-    description: "Track, diagnose, and grow your brand's presence in AI answers, starting with ChatGPT.",
+    description: "Track, diagnose, and grow your brand's presence in AI answers, starting with Grok.",
   },
   robots: { index: true, follow: true },
 };

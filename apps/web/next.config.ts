@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Dashboard IA moved to the template's sections; keep old links working.
+  async redirects() {
+    return [
+      { source: "/gaps", destination: "/opportunities", permanent: true },
+      { source: "/recommendations", destination: "/opportunities", permanent: true },
+      { source: "/results", destination: "/reports", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireCompany } from "@/lib/company";
 import { createClient } from "@/lib/supabase/server";
 import { runPipeline } from "@/lib/pipeline";
+import { planStatus } from "@/lib/plan";
 
 export type ActionResult = { error?: string; message?: string };
 
@@ -11,6 +12,7 @@ const RERUN_COOLDOWN_MS = 60 * 60 * 1000;
 
 export async function rerunAnalysis(): Promise<ActionResult> {
   const company = await requireCompany();
+  if (!planStatus(company).active) return { error: "Your free trial has ended. Choose a plan in Settings to keep running analyses." };
   const supabase = await createClient();
 
   const { data: last } = await supabase
@@ -22,14 +24,14 @@ export async function rerunAnalysis(): Promise<ActionResult> {
     .maybeSingle();
 
   if (last && (last.status === "running" || last.status === "pending")) return { error: "An analysis is already running." };
-  // Cost guardrail: each run makes ~50 ChatGPT calls.
+  // Cost guardrail: each run makes ~50 calls per active AI engine.
   if (last?.status === "completed" && last.started_at && Date.now() - Date.parse(last.started_at) < RERUN_COOLDOWN_MS) {
     return { error: "You can re-run the analysis once per hour." };
   }
 
   const { count } = await supabase.from("prompts").select("id", { count: "exact", head: true }).eq("company_id", company.id);
   try {
-    await runPipeline(count ? "run-chatgpt-batch" : "generate-prompts", { company_id: company.id });
+    await runPipeline(count ? "run-engine-batch" : "generate-prompts", { company_id: company.id });
   } catch {
     return { error: "Couldn't start the analysis. Please try again in a minute." };
   }
@@ -75,6 +77,7 @@ export async function saveGoogleRanks(_: ActionResult, formData: FormData): Prom
       return { error: "Rankings saved, but gap recalculation couldn't start. Try again shortly." };
     }
   }
-  revalidatePath("/gaps");
+  revalidatePath("/queries");
+  revalidatePath("/opportunities");
   return { message: run ? "Rankings saved — recalculating gaps and recommendations…" : "Rankings saved. They'll be used in your first analysis." };
 }

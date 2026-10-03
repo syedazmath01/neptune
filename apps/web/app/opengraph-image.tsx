@@ -25,7 +25,7 @@ export default async function OpengraphImage() {
         <div style={{ marginTop: 56, fontSize: 60, fontWeight: 700, color: "#0e372d", lineHeight: 1.1, display: "flex", flexWrap: "wrap" }}>
           Turn search visibility into&nbsp;<span style={{ color: "#d35826" }}>growth.</span>
         </div>
-        <div style={{ marginTop: 20, fontSize: 30, color: "#1c2321" }}>See how your brand appears in ChatGPT answers — and what to change.</div>
+        <div style={{ marginTop: 20, fontSize: 30, color: "#1c2321" }}>See how your brand appears in AI answers — and what to change.</div>
       </div>
     ),
     size,

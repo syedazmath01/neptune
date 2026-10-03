@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CONTACT_EMAIL } from "@/lib/site";
+import { PRICE, TRIAL_DAYS } from "@/lib/plan";
 import {
   ArrowRight,
   ChartColumn,
@@ -28,7 +30,7 @@ import { MobileMenu } from "@/components/marketing/MobileMenu";
 const NAV = [["Home", "#"], ["Product", "#product"], ["Pricing", "#pricing"], ["Roadmap", "#roadmap"]] as const;
 
 const VALUE_PROPS = [
-  [MessageSquareText, "AI Answer Tracking", "See how your brand appears in ChatGPT."],
+  [MessageSquareText, "AI Answer Tracking", "See how your brand appears in AI answers."],
   [ChartColumn, "Actionable Insights", "Find opportunities to improve visibility."],
   [Users, "Built for Growth Teams", "Designed for founders, marketers and product teams."],
 ] as const;
@@ -42,15 +44,30 @@ const STEPS = [
 ] as const;
 
 const FEATURES = [
-  [MessageSquareText, "Track Brand Mentions", "See where and how your brand appears in ChatGPT answers.", "bg-forest-500/10 text-forest-700"],
+  [MessageSquareText, "Track Brand Mentions", "See where and how your brand appears in Grok answers.", "bg-forest-500/10 text-forest-700"],
   [Lightbulb, "Discover Opportunities", "Find high-intent questions where you can show up.", "bg-terracotta-400/15 text-terracotta-500"],
   [Users, "Analyze Competitors", "See what's working for your competitors.", "bg-teal-600/10 text-teal-700"],
   [Sparkles, "Get Actionable Recommendations", "Receive clear next steps to improve visibility.", "bg-terracotta-400/15 text-terracotta-500"],
 ] as const;
 
+const PLANS = [
+  { name: "Free trial", price: "$0", per: `for ${TRIAL_DAYS} days`, note: "Full access. No credit card.", featured: false, badge: null },
+  { name: "Monthly", price: `$${PRICE.monthly}`, per: "/month", note: "Billed monthly. No long-term commitment.", featured: true, badge: "Most flexible" },
+  { name: "Yearly", price: `$${PRICE.yearly}`, per: "/year", note: `About $${Math.round(PRICE.yearly / 12)}/month — 2 months free.`, featured: false, badge: "Save 17%" },
+] as const;
+
+const PLAN_FEATURES = [
+  "Grok answer tracking (ChatGPT coming soon)",
+  "~50 real customer questions per analysis",
+  "Compare against up to 5 competitors",
+  "Brand mentions & cited websites",
+  "Evidence-backed opportunities",
+  "Before/after reports, CSV & PDF",
+];
+
 const ROADMAP = [
-  ["Now", "Live in MVP", ["ChatGPT answer tracking", "Competitor & citation analysis", "Visibility gap detection", "Evidence-backed recommendations", "Before/after measurement"], "bg-success/15 text-success"],
-  ["Next", "Planned", ["Perplexity, Claude & Gemini tracking", "Google AI Overviews", "Entity & knowledge-graph analysis"], "bg-terracotta-400/15 text-terracotta-600"],
+  ["Now", "Live in MVP", ["Grok answer tracking", "Competitor & citation analysis", "Visibility gap detection", "Evidence-backed recommendations", "Before/after measurement"], "bg-success/15 text-success"],
+  ["Next", "Planned", ["ChatGPT tracking", "Perplexity, Claude & Gemini tracking", "Google AI Overviews", "Entity & knowledge-graph analysis"], "bg-terracotta-400/15 text-terracotta-600"],
   ["Later", "Exploring", ["CMS integrations for direct publishing", "Predictive impact scoring", "SOC 2 & GDPR compliance"], "bg-cream-200 text-muted"],
 ] as const;
 
@@ -67,7 +84,11 @@ const JSON_LD = {
       description: SITE_DESCRIPTION,
       url: SITE_URL,
       publisher: { "@id": `${SITE_URL}/#org` },
-      offers: { "@type": "Offer", price: "0", priceCurrency: "USD", description: "Free during early access" },
+      offers: [
+        { "@type": "Offer", name: "Free trial", price: "0", priceCurrency: "USD", description: `${TRIAL_DAYS}-day free trial, no credit card` },
+        { "@type": "Offer", name: "Monthly", price: String(PRICE.monthly), priceCurrency: "USD", description: "Billed monthly" },
+        { "@type": "Offer", name: "Yearly", price: String(PRICE.yearly), priceCurrency: "USD", description: "Billed yearly (2 months free)" },
+      ],
     },
   ],
 };
@@ -115,7 +136,7 @@ export default function Home() {
                 Turn<br />Search&nbsp;Visibility<br />into <span className="text-terracotta-500">Growth.</span>
               </h1>
               <p className="mt-6 max-w-md text-lg text-ink/80">
-                Track, analyze, and optimize your brand&apos;s presence in AI answers, starting with ChatGPT.
+                Track, analyze, and optimize your brand&apos;s presence in AI answers, starting with Grok.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/signup" className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-forest-800 px-7 font-semibold text-cream-50 hover:bg-forest-700">
@@ -126,7 +147,7 @@ export default function Home() {
                 </a>
               </div>
               <p className="mt-8 inline-flex items-center gap-2 rounded-full bg-forest-500/10 px-4 py-2 text-sm font-medium text-forest-700">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Now in early access · ChatGPT tracking live
+                <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Now in early access · Grok tracking live
               </p>
             </Reveal>
             <HeroScene />
@@ -159,7 +180,7 @@ export default function Home() {
                 Your Brand<br />in AI Answers.<br /><span className="text-terracotta-500">Clearly&nbsp;Visualized.</span>
               </h2>
               <p className="mt-5 max-w-md text-lg text-ink/80">
-                See exactly how your brand is mentioned in ChatGPT, what questions drive visibility, and where you can improve — all in one place.
+                See exactly how your brand is mentioned in AI answers, what questions drive visibility, and where you can improve — all in one place.
               </p>
               <Link href="/signup" className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-full bg-forest-800 px-7 font-semibold text-cream-50 hover:bg-forest-700">
                 Start Free <ArrowRight size={17} />
@@ -230,7 +251,7 @@ export default function Home() {
                   <p className="text-xs font-semibold uppercase tracking-[0.25em] text-terracotta-500">Our promise</p>
                   <h3 className="mt-3 font-display text-2xl leading-snug text-ink">Every recommendation shows its evidence.</h3>
                   <ul className="mt-5 space-y-3 text-ink/85">
-                    {["The exact prompt we asked ChatGPT", "The full answer it gave", "Which brands it cited — and how often"].map((t) => (
+                    {["The exact prompt we asked the AI", "The full answer it gave", "Which brands it cited — and how often"].map((t) => (
                       <li key={t} className="flex items-start gap-2.5"><CircleCheck size={19} className="mt-0.5 shrink-0 text-forest-700" /> {t}</li>
                     ))}
                   </ul>
@@ -245,20 +266,22 @@ export default function Home() {
                 <div>
                   <h3 className="font-display text-2xl font-semibold text-forest-800">Platform Coverage</h3>
                   <div className="mt-4 flex items-center gap-3">
-                    <Image src="/art/chatgpt.png" alt="ChatGPT" width={94} height={86} className="h-12 w-auto rounded-xl" />
+                    <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ink text-cream-50" aria-hidden>
+                      <Sparkles size={22} />
+                    </span>
                     <div>
-                      <p className="font-semibold">ChatGPT</p>
+                      <p className="font-semibold">Grok</p>
                       <p className="text-sm font-medium text-forest-600">Live in MVP</p>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm text-muted">Track your brand visibility in ChatGPT answers now.</p>
+                  <p className="mt-3 text-sm text-muted">Track your brand visibility in Grok answers now.</p>
                 </div>
                 <div className="md:pl-6">
                   <p className="text-sm font-medium text-forest-700">Coming Soon</p>
-                  <ul className="mt-3 grid max-w-md grid-cols-3 gap-3 sm:grid-cols-6">
-                    {["Google", "Perplexity", "Gemini", "YouTube", "Reddit", "LinkedIn"].map((p) => (
+                  <ul className="mt-3 grid max-w-md grid-cols-4 gap-3 sm:grid-cols-7">
+                    {["ChatGPT", "Google", "Perplexity", "Gemini", "YouTube", "Reddit", "LinkedIn"].map((p) => (
                       <li key={p} className="flex flex-col items-center gap-1 text-[11px] text-muted">
-                        <Image src={`/art/logo-${p.toLowerCase()}.png`} alt="" width={120} height={120} className="h-12 w-12 rounded-xl shadow-sm" />
+                        <Image src={p === "ChatGPT" ? "/art/chatgpt.png" : `/art/logo-${p.toLowerCase()}.png`} alt="" width={120} height={120} className="h-12 w-12 rounded-xl shadow-sm" />
                         {p}
                       </li>
                     ))}
@@ -308,22 +331,43 @@ export default function Home() {
 
         {/* PRICING */}
         <section id="pricing" className="relative pb-16">
-          <div className="mx-auto max-w-3xl px-4 md:px-8">
-            <Reveal className="glass rounded-3xl p-8 text-center md:p-10">
+          <div className="mx-auto max-w-5xl px-4 md:px-8">
+            <Reveal className="text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-terracotta-500">Pricing</p>
-              <h2 className="mt-3 font-display text-[clamp(2rem,4vw,2.75rem)] font-semibold text-forest-800">Free during early access</h2>
-              <p className="mx-auto mt-3 max-w-xl text-muted">
-                Neptune is in early access. Everything available today is free to use. Paid plans for growing teams will be announced to early-access users first.
-              </p>
-              <ul className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-2">
-                {["ChatGPT visibility tracking", "Competitor & citation analysis", "Gap detection", "Evidence-backed recommendations", "Before/after measurement", "No credit card required"].map((f) => (
-                  <li key={f} className="flex items-center gap-2.5"><CircleCheck size={18} className="shrink-0 text-forest-700" /> {f}</li>
-                ))}
-              </ul>
-              <Link href="/signup" className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-full bg-forest-800 px-8 font-semibold text-cream-50 hover:bg-forest-700">
-                Start Free <ArrowRight size={17} />
-              </Link>
+              <h2 className="mt-3 font-display text-[clamp(2rem,4vw,2.75rem)] font-semibold text-forest-800">Start free. Upgrade when it works for you.</h2>
+              <p className="mx-auto mt-3 max-w-xl text-muted">Every plan starts with a {TRIAL_DAYS}-day free trial with full access — no credit card required.</p>
             </Reveal>
+            <div className="mt-10 grid gap-5 md:grid-cols-3">
+              {PLANS.map((p, i) => (
+                <Reveal key={p.name} delay={i * 0.08} className="glass relative flex flex-col rounded-3xl p-7">
+                  {p.badge && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-terracotta-500 px-3 py-1 text-xs font-semibold text-white">{p.badge}</span>
+                  )}
+                  <h3 className="font-semibold text-ink">{p.name}</h3>
+                  <p className="mt-3 flex items-baseline gap-1">
+                    <span className="font-display text-4xl font-semibold text-forest-800">{p.price}</span>
+                    <span className="text-muted">{p.per}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-muted">{p.note}</p>
+                  <ul className="mb-7 mt-5 space-y-2.5 text-sm">
+                    {PLAN_FEATURES.map((f) => (
+                      <li key={f} className="flex items-start gap-2.5"><CircleCheck size={17} className="mt-0.5 shrink-0 text-forest-700" /> {f}</li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/signup"
+                    className={`mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 font-semibold ${
+                      p.featured ? "bg-forest-800 text-cream-50 hover:bg-forest-700" : "border border-forest-800/20 bg-white/70 text-forest-800 hover:bg-white"
+                    }`}
+                  >
+                    Start free trial <ArrowRight size={16} />
+                  </Link>
+                </Reveal>
+              ))}
+            </div>
+            <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted">
+              Before your trial ends we&apos;ll email you to choose monthly or yearly, and send an invoice. Your data stays in your account either way.
+            </p>
           </div>
         </section>
 
@@ -335,13 +379,13 @@ export default function Home() {
             <div className="flex-1">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-400">From Search to AI Answers</p>
               <h2 className="mt-3 font-display text-[clamp(1.9rem,3.6vw,2.75rem)] font-semibold text-[#fbf4e3]">Be Found Where People Ask.</h2>
-              <p className="mt-2 text-[#f6ecd5]/90">Join early and start tracking your brand in ChatGPT.</p>
+              <p className="mt-2 text-[#f6ecd5]/90">Join early and start tracking your brand in AI answers.</p>
             </div>
             <div className="text-center">
               <Link href="/signup" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#fbf4e3] px-10 font-semibold text-[#0e372d] hover:bg-[#fffaf0]">
                 Start Free <ArrowRight size={17} />
               </Link>
-              <p className="mt-2 text-sm text-[#f6ecd5]/80">No credit card required.</p>
+              <p className="mt-2 text-sm text-[#f6ecd5]/80">{TRIAL_DAYS}-day free trial · No credit card required.</p>
             </div>
           </Reveal>
         </section>
@@ -364,7 +408,7 @@ export default function Home() {
             <p className="mt-2 text-sm text-muted">AI search visibility for the next generation of brands.</p>
           </div>
           <ul className="flex flex-wrap gap-6 text-sm font-medium">
-            {[["Product", "#product"], ["Pricing", "#pricing"], ["Roadmap", "#roadmap"], ["FAQ", "#faq"]].map(([l, h]) => (
+            {[["Product", "#product"], ["Pricing", "#pricing"], ["Roadmap", "#roadmap"], ["FAQ", "#faq"], ["Privacy", "/privacy"], ["Terms", "/terms"], ["Contact", `mailto:${CONTACT_EMAIL}`]].map(([l, h]) => (
               <li key={l}><a href={h} className="py-2">{l}</a></li>
             ))}
           </ul>

@@ -54,7 +54,7 @@ pipelineStep("map-content-gaps", async ({ company_id, round }) => {
 
   const competitorUrls = (await roundCitations(sb, companyId, round as number))
     .filter((c) => c.entity_type === "competitor" && c.url)
-    .map((c) => c.url as string);
+    .map((c) => ({ url: c.url as string, engine: c.engine }));
 
   if (competitorUrls.length) {
     const gaps = detectContentGaps(competitorUrls, await sitemapUrls(domain), name);

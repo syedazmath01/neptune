@@ -66,7 +66,9 @@ without carrying this same lockup rule forward.
   package) for 3D-feel/marketing animation and dashboard micro-interactions
 - **Backend:** Supabase (Postgres + Row Level Security, Auth, Storage,
   Realtime, Edge Functions on Deno), pg_cron for scheduling
-- **AI:** OpenAI API (`openai` npm SDK) — ChatGPT only for MVP
+- **AI:** `openai` npm SDK against OpenAI-compatible APIs. Grok (xAI) is the live engine; ChatGPT
+  (OpenAI) switches on when `OPENAI_API_KEY` is set. Engines are scored separately, never mixed
+  (`archicture.md` Section 13)
 - **Email:** Resend · **Monitoring:** Sentry
 - **Hosting:** Vercel (frontend) + Supabase Cloud (backend)
 
@@ -89,7 +91,7 @@ Edge Functions map 1:1 to PRD features — keep that mapping when adding code:
 | Edge Function | PRD Feature |
 |---|---|
 | `generate-prompts` | 1.1 |
-| `run-chatgpt-batch` | 1.2 |
+| `run-engine-batch` | 1.2 |
 | `extract-citations` | 1.3 |
 | `analyze-competitors` | 1.4 |
 | `analyze-gaps` | 1.5 |
@@ -119,6 +121,10 @@ there rather than over-building into the next phase.
   parameterized queries.
 - Schema changes go through versioned migrations in `supabase/migrations/`,
   never hand-edited directly against a live project.
+- **New tables need explicit `grant`s** (see `20261001000300_table_grants.sql`):
+  this Supabase project doesn't auto-grant public tables to `authenticated` /
+  `service_role`, so a table with RLS policies but no grant fails with
+  "permission denied". Grant only what the table's policies allow.
 
 ## Conventions
 
@@ -139,7 +145,8 @@ there rather than over-building into the next phase.
   `archicture.md` Section 16, Decision Log). If you see stale references to
   it anywhere, that's a doc bug, not the plan.
 - Don't build self-serve payment/checkout flows for MVP (see `prd.md`
-  Section 6) — that's deferred.
-- Don't add multi-engine support (Perplexity, Claude, Gemini), ML-based
+  Section 6) — that's deferred. Plans exist (14-day trial, $29/mo, $290/yr)
+  but are invoiced manually; see `archicture.md` Section 13 "Plans".
+- Don't add engines beyond Grok and ChatGPT (Perplexity, Claude, Gemini), ML-based
   recommendations, or automated CMS publishing — all explicitly out of
   scope for MVP (`prd.md` Section 6).

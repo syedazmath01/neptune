@@ -165,11 +165,11 @@ Neptune is a **closed-loop AI visibility optimization platform** that:
 
 ---
 
-#### Feature 1.2: Multi-Engine Observation (MVP v1: ChatGPT only)
+#### Feature 1.2: Multi-Engine Observation (MVP: Grok live, ChatGPT when its key is added)
 **Description**: Runs prompts across AI answer engines and captures complete responses.
 
 **Specifications**:
-- **MVP Phase**: ChatGPT (GPT-4) via OpenAI API
+- **MVP Phase**: Grok (xAI API) is the live engine. ChatGPT (OpenAI API) switches on automatically once `OPENAI_API_KEY` is set, with no code change. Every prompt is asked to every active engine, and each engine is scored separately (never mixed)
 - **Scope**: Each prompt gets one response; full text captured
 - **Data Collected**:
   - Complete AI response (text)
@@ -182,12 +182,12 @@ Neptune is a **closed-loop AI visibility optimization platform** that:
   - Weekly runs thereafter
   - Complete response history retained
 - **Cost Management**:
-  - Use GPT-4 Turbo (cost optimization)
+  - Use the cheaper model tier per engine (`grok-4.3`, `gpt-4-turbo`); cost scales with the number of active engines
   - Cache repeated prompts to reduce API calls
   - Batch run all 50 prompts in single session
 
 **Technical**:
-- OpenAI API integration (ChatGPT)
+- OpenAI-compatible API integration via the `openai` SDK (xAI for Grok, OpenAI for ChatGPT)
 - Response parsing and raw storage
 - Schema: `{prompt_id, engine, timestamp, full_response_text, raw_sources}`
 
@@ -504,7 +504,7 @@ Neptune is a **closed-loop AI visibility optimization platform** that:
 ## 6. Non-MVP (Future Phases)
 
 ### Out of Scope for MVP:
-- Multi-engine support (Perplexity, Claude, Google, Bing) → Phase 2
+- Engines beyond Grok and ChatGPT (Perplexity, Claude, Gemini, Google, Bing) → Phase 2
 - Automated entity/knowledge graph → Phase 2
 - ML-based recommendation generation → Phase 2
 - Automated implementation (API-driven content changes) → Phase 2
@@ -612,7 +612,7 @@ Neptune is a **closed-loop AI visibility optimization platform** that:
 | Auth | Supabase Auth (email/password + Google OAuth) |
 | Long-running/scheduled logic | Supabase Edge Functions (Deno) |
 | Scheduling | pg_cron (Supabase) |
-| AI Integration | OpenAI API (`openai` npm SDK) — ChatGPT for MVP |
+| AI Integration | `openai` npm SDK against OpenAI-compatible APIs: Grok (xAI) now, ChatGPT (OpenAI) when its key is set |
 | File Storage | Supabase Storage |
 | Realtime Updates | Supabase Realtime |
 | Email | Resend |
@@ -627,7 +627,7 @@ See `archicture.md`:
 - **Section 7** — Edge Function responsibilities, mapped 1:1 to PRD Features 1.1–3.1
 - **Section 11** — API surface (Server Actions + Route Handlers); most dashboard reads go directly through the Supabase client in Server Components rather than custom REST routes, since RLS already enforces access control
 
-**Why this split matters for Claude Code:** each Edge Function in `supabase/functions/` maps 1:1 to a PRD feature (`generate-prompts` → 1.1, `run-chatgpt-batch` → 1.2, etc.), so you can prompt Claude Code with "implement `generate-prompts` per Feature 1.1 in PRD.md, using the schema in archicture.md Section 5" and it has a clear, isolated target.
+**Why this split matters for Claude Code:** each Edge Function in `supabase/functions/` maps 1:1 to a PRD feature (`generate-prompts` → 1.1, `run-engine-batch` → 1.2, etc.), so you can prompt Claude Code with "implement `generate-prompts` per Feature 1.1 in PRD.md, using the schema in archicture.md Section 5" and it has a clear, isolated target.
 
 ---
 
@@ -654,7 +654,7 @@ See `archicture.md`:
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| **OpenAI API Costs Scale** | High | Implement caching, use GPT-4 Turbo, set monthly limits, batch requests |
+| **AI Engine API Costs Scale** | High | Implement caching, use cheaper model tiers, set monthly limits per provider, batch requests; each active engine adds ~50 calls per round |
 | **Citation Extraction Accuracy <85%** | High | Start with manual labeling (100 responses), build rules incrementally, flag low-confidence |
 | **Causation Hard to Prove** | High | Use statistical significance testing, control groups, longer measurement windows (3-4 weeks) |
 | **Prompt Drift Over Time** | Medium | Store all prompts immutably, version control, re-run exact same prompts |
@@ -673,7 +673,7 @@ Each phase below is scoped to be a self-contained Claude Code session with a wor
 | **Phase 1: Data Models** | Create all core tables + RLS policies | `archicture.md` Section 5 | `supabase db push` applies migrations clean; can insert/query a `companies` row as an authenticated test user; a second test user cannot see it (RLS verified) |
 | **Phase 2: Onboarding** | Company profile form + Server Action | Feature 4.1 | Can submit company + competitors via UI, row appears in DB under the correct `owner_id` |
 | **Phase 3: Prompt Generation** | `generate-prompts` Edge Function | Feature 1.1 | Given a company, returns categorized prompt list saved to `prompts` table |
-| **Phase 4: ChatGPT Runner** | `run-chatgpt-batch` Edge Function | Feature 1.2 | Batch-runs all prompts for a company (batched per `archicture.md` Section 7), stores full response text in `responses` |
+| **Phase 4: AI Engine Runner** | `run-engine-batch` Edge Function | Feature 1.2 | Batch-runs all prompts for a company through every active engine (Grok now, ChatGPT when keyed) (batched per `archicture.md` Section 7), stores full response text in `responses` |
 | **Phase 5: Citation Extraction** | `extract-citations` Edge Function | Feature 1.3 | Given raw response, extracts domain/brand/context into `citations` rows |
 | **Phase 6: Competitor Analysis** | `analyze-competitors` Edge Function | Feature 1.4 | Returns citation count / recommendation rate per competitor |
 | **Phase 7: Gap Analyzer** | `analyze-gaps` Edge Function | Feature 1.5 | Given manual Google rank input, flags gap types with priority score in `gaps` table |
@@ -693,7 +693,8 @@ Each phase below is scoped to be a self-contained Claude Code session with a wor
 ### Required API Keys / Accounts
 | Service | Used For | Get It From |
 |---------|----------|--------------|
-| OpenAI API Key | ChatGPT prompt runs (Feature 1.2) | platform.openai.com |
+| xAI API Key | Grok prompt runs (Feature 1.2), current engine | console.x.ai |
+| OpenAI API Key | ChatGPT prompt runs (Feature 1.2), optional until ChatGPT goes live | platform.openai.com |
 | Supabase project (URL, anon key, service_role key) | Database, Auth, Edge Functions, Storage, Realtime | supabase.com |
 | Resend API key | Transactional email | resend.com |
 | Sentry DSN (optional, post-Phase 9) | Error monitoring | sentry.io |
@@ -707,7 +708,9 @@ SUPABASE_SERVICE_ROLE_KEY=        # Server-only, never NEXT_PUBLIC_
 
 ### Supabase Edge Function secrets (set via `supabase secrets set`)
 ```
-OPENAI_API_KEY=
+XAI_API_KEY=                      # Grok — active when set (current engine)
+XAI_MODEL=grok-4.3                # optional; grok-4.7 is the flagship
+OPENAI_API_KEY=                   # ChatGPT — switches on automatically when set
 OPENAI_MODEL=gpt-4-turbo
 RESEND_API_KEY=
 SLACK_WEBHOOK_URL=
@@ -728,8 +731,8 @@ npm run dev
 ```
 
 ### Cost Guardrails (Important for Solo/Indie Builds)
-- Cap OpenAI usage with a monthly budget alert in the OpenAI dashboard before Phase 4
-- Use `gpt-4-turbo` not `gpt-4` for cost control during dev/testing
+- Cap usage with a monthly budget alert in the xAI console (and OpenAI dashboard once ChatGPT is on) before Phase 4
+- Use `grok-4.3` (and `gpt-4-turbo` not `gpt-4`) for cost control during dev/testing
 - Cache prompt responses in dev so you're not re-calling the API every time you test parsing logic (Phase 5) — this alone can cut dev-time API costs by 80%+
 
 ---

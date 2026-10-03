@@ -11,3 +11,12 @@ node_modules/
 .agents/
 graphify-out/
 skills-lock.json
+
+# exported analysis data (company-specific; repo is public)
+neptune-*.csv
+
+# Vercel CLI project link
+.vercel/
+
+# browser QA screenshots/logs (local only)
+.playwright-mcp/

@@ -1,10 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/overview", "/gaps", "/recommendations", "/results", "/settings", "/onboarding"];
+const PROTECTED_PREFIXES = ["/overview", "/answers", "/queries", "/mentions", "/competitors", "/opportunities", "/reports", "/settings", "/onboarding"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 export async function updateSession(request: NextRequest) {
+  // Supabase falls back to the bare Site URL when a redirect isn't allow-listed;
+  // finish the sign-in instead of dropping the code on the home page.
+  const code = request.nextUrl.searchParams.get("code");
+  if (request.nextUrl.pathname === "/" && code) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = "/auth/callback";
+    callback.search = "";
+    callback.searchParams.set("code", code);
+    callback.searchParams.set("next", "/overview"); // sends new users on to onboarding
+    return NextResponse.redirect(callback);
+  }
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

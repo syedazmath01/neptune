@@ -26,7 +26,13 @@ export function CompetitorChart({ data }: { data: { name: string; mentions: numb
   );
 }
 
-export function TrendChart({ data }: { data: { round: string; citation: number; recommendation: number }[] }) {
+export function TrendChart({
+  data,
+  names = ["Citation share", "Recommendation share"],
+}: {
+  data: { round: string; citation: number; recommendation: number }[];
+  names?: [string, string];
+}) {
   return (
     <div className="h-72 w-full">
       <ResponsiveContainer>
@@ -36,8 +42,8 @@ export function TrendChart({ data }: { data: { round: string; citation: number; 
           <YAxis unit="%" {...axis} />
           <Tooltip {...tooltip} formatter={(v) => `${v}%`} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line type="monotone" dataKey="citation" name="Citation share" stroke="var(--color-forest-500)" strokeWidth={2.5} dot={{ r: 4 }} />
-          <Line type="monotone" dataKey="recommendation" name="Recommendation share" stroke="var(--color-terracotta-500)" strokeWidth={2.5} dot={{ r: 4 }} />
+          <Line type="monotone" dataKey="citation" name={names[0]} stroke="var(--color-forest-500)" strokeWidth={2.5} dot={{ r: 4 }} />
+          <Line type="monotone" dataKey="recommendation" name={names[1]} stroke="var(--color-terracotta-500)" strokeWidth={2.5} dot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>

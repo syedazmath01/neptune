@@ -1,9 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { extractCitations } from "./extract.ts";
 import { changeConfidence, metrics, scorecard } from "./score.ts";
-import { detectContentGaps, detectGaps, parseSitemap } from "./gaps.ts";
+import { detectContentGaps, detectGaps, mergeEngineGaps, parseSitemap } from "./gaps.ts";
 import { recommend } from "./recommend.ts";
-import { parsePrompts } from "./prompts.ts";
+import { parsePrompts, promptGenerationMessages } from "./prompts.ts";
 import type { Brand } from "./types.ts";
 
 const brands: Brand[] = [
@@ -13,7 +13,7 @@ const brands: Brand[] = [
   { name: "Trello", domain: "trello.com", kind: "competitor" },
 ];
 
-// Mocked ChatGPT answer (stands in for the OpenAI call).
+// Mocked AI engine answer (stands in for the Grok / ChatGPT call).
 const ANSWER = `Here are the best project management tools for remote teams:
 
 1. **Asana** – Excellent for structured workflows. See https://asana.com/uses/remote-teams
@@ -72,11 +72,13 @@ Deno.test("detectGaps finds substitution, authority and coverage gaps with rank-
       { prompt_id: "p5", text: "all good", category: "feature", google_rank: 1, own: { mentioned: true, recommended: true }, competitors: [] },
     ],
     "Acme",
+    "grok",
   );
   const types = gaps.map((g) => g.gap_type);
   assertEquals(gaps[0].gap_type, "substitution_gap");
   assertEquals(gaps[0].priority, "high"); // rank #2 (×3) × missing (×2) × (1+1 competitor)
   assert(gaps[0].description.includes("You rank #2"));
+  assert(gaps[0].description.startsWith("Grok recommends Asana"));
   assert(types.includes("authority_gap"));
   assert(types.includes("coverage_gap"));
   assertEquals(types.filter((t) => t === "visibility_gap").length, 2);
@@ -85,12 +87,18 @@ Deno.test("detectGaps finds substitution, authority and coverage gaps with rank-
 
 Deno.test("content gaps: competitor-cited formats the site lacks", () => {
   const gaps = detectContentGaps(
-    ["https://asana.com/faq/remote", "https://clickup.com/vs/asana", "https://clickup.com/customers/acme-inc"],
+    [
+      { url: "https://asana.com/faq/remote", engine: "grok" },
+      { url: "https://clickup.com/vs/asana", engine: "chatgpt" },
+      { url: "https://clickup.com/customers/acme-inc", engine: "chatgpt" },
+    ],
     ["https://acme.com/", "https://acme.com/vs/asana"],
     "Acme",
   );
   assertEquals(gaps.map((g) => g.gap_type).sort(), ["evidence_gap", "format_gap"]);
-  assert(gaps.some((g) => g.description.includes("FAQ")));
+  const faq = gaps.find((g) => g.description.includes("FAQ"))!;
+  assertEquals(faq.engines, ["grok"]);
+  assert(faq.description.startsWith("Grok cites"));
 });
 
 Deno.test("parseSitemap reads <loc> entries", () => {
@@ -98,11 +106,28 @@ Deno.test("parseSitemap reads <loc> entries", () => {
 });
 
 Deno.test("recommend maps each gap to an evidence-backed action", () => {
-  const [gap] = detectGaps([{ prompt_id: "p1", text: "best pm tool", category: "x", google_rank: null, own: { mentioned: false, recommended: false }, competitors: [{ name: "Asana", mentioned: true, recommended: true }] }], "Acme");
+  const [gap] = detectGaps([{ prompt_id: "p1", text: "best pm tool", category: "x", google_rank: null, own: { mentioned: false, recommended: false }, competitors: [{ name: "Asana", mentioned: true, recommended: true }] }], "Acme", "grok");
   const r = recommend(gap, "Acme");
   assertEquals(r.action_type, "create_content");
   assert(r.title.includes("best pm tool"));
   assertEquals(r.evidence, gap.description);
+  assert(r.description.startsWith("Grok recommends competitors"));
+  assert(recommend({ ...gap, engines: ["grok", "chatgpt"] }, "Acme").description.startsWith("Grok and ChatGPT recommend competitors"));
+});
+
+Deno.test("mergeEngineGaps: same gap on two engines becomes one, tagged with both, higher priority", () => {
+  const fact = (recommended: boolean) => ({
+    prompt_id: "p1", text: "best pm tool", category: "x", google_rank: null,
+    own: { mentioned: false, recommended: false }, competitors: [{ name: "Asana", mentioned: recommended, recommended }],
+  });
+  const grok = detectGaps([fact(true)], "Acme", "grok");
+  const chatgpt = detectGaps([fact(true)], "Acme", "chatgpt");
+  const merged = mergeEngineGaps([...grok, ...chatgpt]);
+  assertEquals(merged.length, 1);
+  assertEquals(merged[0].engines.sort(), ["chatgpt", "grok"]);
+  assertEquals(merged[0].priority_score, grok[0].priority_score + chatgpt[0].priority_score);
+  // Different gap types on each engine stay separate.
+  assertEquals(mergeEngineGaps([...grok, ...detectGaps([fact(false)], "Acme", "chatgpt")]).length, 2);
 });
 
 Deno.test("parsePrompts validates, dedupes and rejects bad categories", () => {
@@ -117,4 +142,18 @@ Deno.test("parsePrompts validates, dedupes and rejects bad categories", () => {
   });
   assertEquals(parsePrompts(raw).map((p) => p.text), ["best CRM for startups", "hubspot vs pipedrive for small teams"]);
   assertEquals(parsePrompts("not json"), []);
+});
+
+Deno.test("prompt generation includes the onboarding goals", () => {
+  const [, user] = promptGenerationMessages({ name: "Acme", domain: "acme.com", industry: "saas", products: "CRM", goals: "Reduce CAC — leads are too expensive", competitors: [] });
+  assertEquals(JSON.parse(user.content).goals, "Reduce CAC — leads are too expensive");
+});
+
+Deno.test("planActive: trial or paid plan in the future", async () => {
+  const { planActive } = await import("./runtime.ts");
+  const now = Date.parse("2026-10-20T00:00:00Z");
+  assert(planActive({ trial_ends_at: "2026-10-21T00:00:00Z", paid_until: null }, now)); // trial running
+  assert(!planActive({ trial_ends_at: "2026-10-15T00:00:00Z", paid_until: null }, now)); // trial over, unpaid
+  assert(planActive({ trial_ends_at: "2026-10-15T00:00:00Z", paid_until: "2026-11-15T00:00:00Z" }, now)); // paid
+  assert(!planActive({ trial_ends_at: "2026-10-15T00:00:00Z", paid_until: "2026-10-16T00:00:00Z" }, now)); // paid period lapsed
 });

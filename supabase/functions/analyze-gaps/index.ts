@@ -1,7 +1,9 @@
 // Feature 1.5 — compare AI visibility (this round) with Google rank input and record gaps.
-// Also re-run on its own when the user saves Google rankings (no ChatGPT cost).
+// Gaps are found per engine, then merged so a gap seen on several engines appears once, tagged with each.
+// Also re-run on its own when the user saves Google rankings (no AI engine cost).
 import { chain, db, loadBrands, must, pipelineStep, roundCitations } from "../_shared/runtime.ts";
-import { detectGaps, type PromptFacts } from "../_shared/gaps.ts";
+import { detectGaps, mergeEngineGaps, type PromptFacts } from "../_shared/gaps.ts";
+import type { Engine } from "../_shared/types.ts";
 
 pipelineStep("analyze-gaps", async ({ company_id, round }) => {
   const sb = db();
@@ -12,15 +14,17 @@ pipelineStep("analyze-gaps", async ({ company_id, round }) => {
   const prompts = must(
     await sb
       .from("prompts")
-      .select("id, text, category, google_rank, responses!inner(measurement_round)")
+      .select("id, text, category, google_rank, responses!inner(measurement_round, engine)")
       .eq("company_id", companyId)
       .eq("active", true)
       .eq("responses.measurement_round", round),
     "load prompts",
-  ) as { id: string; text: string; category: string; google_rank: number | null }[];
+  ) as { id: string; text: string; category: string; google_rank: number | null; responses: { engine: Engine }[] }[];
 
-  const facts: PromptFacts[] = prompts.map((p) => {
-    const cs = citations.filter((c) => c.prompt_id === p.id);
+  // From answers, not citations: an engine that cited nobody is exactly the "you're invisible" case.
+  const engines = [...new Set(prompts.flatMap((p) => p.responses.map((r) => r.engine)))];
+  const factsFor = (engine: Engine): PromptFacts[] => prompts.filter((p) => p.responses.some((r) => r.engine === engine)).map((p) => {
+    const cs = citations.filter((c) => c.prompt_id === p.id && c.engine === engine);
     const own = cs.filter((c) => c.entity_type === "own_company");
     return {
       prompt_id: p.id,
@@ -47,7 +51,7 @@ pipelineStep("analyze-gaps", async ({ company_id, round }) => {
   if (kept.length) del = del.not("id", "in", `(${kept.map((k) => k.gap_id).join(",")})`);
   must(await del.select("id"), "clear open gaps");
 
-  const gaps = detectGaps(facts, name);
+  const gaps = mergeEngineGaps(engines.flatMap((e) => detectGaps(factsFor(e), name, e)));
   if (gaps.length) must(await sb.from("gaps").insert(gaps.map((g) => ({ company_id: companyId, ...g }))).select("id"), "insert gaps");
 
   await chain("map-content-gaps", { company_id, round });

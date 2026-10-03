@@ -5,9 +5,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { Minus, Plus } from "lucide-react";
 
 const FAQ = [
-  ["What does Neptune track right now?", "In our MVP, Neptune tracks how your brand appears in ChatGPT answers. Support for Google, Perplexity, Gemini and other platforms is coming soon."],
+  ["What does Neptune track right now?", "Right now Neptune tracks how your brand appears in Grok answers. ChatGPT is next, followed by Google, Perplexity, Gemini and other platforms."],
   ["Do I need technical knowledge to use Neptune?", "No. Enter your domain and competitors — Neptune generates the prompts, runs them, and explains the results in plain language."],
   ["How do you prove a change worked?", "Neptune re-runs the exact same prompts after you implement a recommendation and shows the before/after difference."],
+  ["Why does the before/after take 14 days?", "AI assistants need time to discover a change on your website, and asking the next day usually shows nothing. So Neptune re-checks automatically 14 days after you mark a recommendation implemented — and you can run a new analysis yourself at any time."],
+  ["How much does Neptune cost?", "Every account starts with a 14-day free trial — no credit card needed. After that it's $29/month, or $290/year (2 months free). We email you before your trial ends and invoice you directly."],
 ] as const;
 
 export function Faq() {

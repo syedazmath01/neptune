@@ -17,7 +17,7 @@ export const getCurrentCompany = cache(async () => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("companies")
-    .select("id, name, domain, industry, onboarding_completed")
+    .select("id, name, domain, industry, products_services, business_goals, onboarding_completed, created_at, plan, trial_ends_at, paid_until")
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();

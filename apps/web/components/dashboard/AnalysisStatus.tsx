@@ -37,7 +37,7 @@ export function AnalysisStatus({ round, total, done: initialDone }: { round: num
     };
   }, [round, router]);
 
-  const stage = !total ? "Generating customer-intent prompts…" : done < total ? `Asking ChatGPT… ${done}/${total} prompts` : "Extracting citations, gaps and recommendations…";
+  const stage = !total ? "Generating customer-intent prompts…" : done < total ? `Asking AI engines… ${done}/${total} answers` : "Extracting citations, gaps and recommendations…";
   const pct = !total ? 8 : Math.min(95, 10 + (done / total) * 80);
 
   return (

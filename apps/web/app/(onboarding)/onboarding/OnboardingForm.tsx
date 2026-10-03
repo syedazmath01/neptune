@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { createCompany, type OnboardingState } from "./actions";
+import { DOMAIN_PATTERN as DOMAIN } from "@/lib/domain";
 
 const STEPS = ["Company", "Competitors", "Goals"] as const;
 
@@ -13,9 +14,30 @@ export function OnboardingForm() {
   const [state, action, pending] = useActionState<OnboardingState, FormData>(createCompany, {});
   const [step, setStep] = useState(0);
   const [competitors, setCompetitors] = useState(["", ""]);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Steps are hidden, not unmounted, so the browser can't flag a hidden empty field on submit.
+  // Check the visible step's fields before moving on.
+  const next = () => {
+    const fields = formRef.current?.querySelectorAll<HTMLInputElement>(`[data-step="${step}"] :is(input, select, textarea)`) ?? [];
+    if ([...fields].every((f) => f.reportValidity())) setStep((s) => s + 1);
+  };
 
   return (
-    <form action={action} className="w-full max-w-xl glass rounded-3xl p-6 md:p-8">
+    <form
+      ref={formRef}
+      action={action}
+      // A required field on a hidden step blocks submit silently; jump to that step and show why.
+      onInvalidCapture={(e) => {
+        const field = e.target as HTMLInputElement;
+        const s = Number(field.closest("[data-step]")?.getAttribute("data-step"));
+        if (s !== step) {
+          setStep(s);
+          requestAnimationFrame(() => field.reportValidity());
+        }
+      }}
+      className="w-full max-w-xl glass rounded-3xl p-6 md:p-8"
+    >
       <ol className="mb-8 flex gap-2">
         {STEPS.map((label, i) => (
           <li key={label} className="flex-1">
@@ -47,14 +69,14 @@ export function OnboardingForm() {
         </motion.div>
       </AnimatePresence>
 
-      <div className={step === 0 ? "mt-6 space-y-4" : "hidden"}>
+      <div data-step="0" className={step === 0 ? "mt-6 space-y-4" : "hidden"}>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">Company name</span>
           <input name="name" required className={input} />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">Website domain</span>
-          <input name="domain" required placeholder="acme.com" className={input} />
+          <input name="domain" required placeholder="acme.com" pattern={DOMAIN} title="Enter your website address, e.g. acme.com" className={input} />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">Industry</span>
@@ -72,15 +94,19 @@ export function OnboardingForm() {
         </label>
       </div>
 
-      <div className={step === 1 ? "mt-6 space-y-3" : "hidden"}>
-        <p className="text-sm text-muted">Add 2–5 competitor domains.</p>
+      <div data-step="1" className={step === 1 ? "mt-6 space-y-3" : "hidden"}>
+        <p className="text-sm text-muted">Add the website addresses (like hubspot.com) of 2–5 companies that sell something similar to you. Neptune checks whether AI recommends them instead of you.</p>
         {competitors.map((value, i) => (
           <input
             key={i}
             name="competitor"
+            required={i < 2}
+            pattern={DOMAIN}
+            title="Enter the competitor's website address, e.g. hubspot.com (not just the name)"
+            aria-label={`Competitor ${i + 1} website`}
             value={value}
             onChange={(e) => setCompetitors((c) => c.map((v, j) => (j === i ? e.target.value : v)))}
-            placeholder={`competitor${i + 1}.com`}
+            placeholder={i === 0 ? "e.g. hubspot.com" : `competitor${i + 1}.com`}
             className={input}
           />
         ))}
@@ -95,7 +121,8 @@ export function OnboardingForm() {
         )}
       </div>
 
-      <div className={step === 2 ? "mt-6 space-y-4" : "hidden"}>
+      <div data-step="2" className={step === 2 ? "mt-6 space-y-4" : "hidden"}>
+        <p className="text-sm text-muted">Neptune uses your goal and pain point to choose which customer questions to ask AI assistants.</p>
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">Primary goal</span>
           <select name="goal" defaultValue="Increase inbound leads" className={input}>
@@ -123,7 +150,7 @@ export function OnboardingForm() {
         {step < STEPS.length - 1 ? (
           <button
             type="button"
-            onClick={() => setStep((s) => s + 1)}
+            onClick={next}
             className="min-h-11 rounded-xl bg-forest-700 px-6 font-semibold text-cream-50 hover:bg-forest-800"
           >
             Continue

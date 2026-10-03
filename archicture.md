@@ -45,7 +45,7 @@ flowchart TB
     end
 
     subgraph External["External Services"]
-        OpenAI["OpenAI API<br/>(ChatGPT)"]
+        OpenAI["AI engine APIs<br/>(Grok via xAI, ChatGPT via OpenAI)"]
         Resend["Resend/Email<br/>(notifications)"]
         Slack["Slack API<br/>(alerts, optional)"]
         Sentry["Sentry<br/>(monitoring)"]
@@ -71,7 +71,7 @@ flowchart TB
 
 **Why this split:**
 - **Next.js** owns everything user-facing: onboarding, dashboard rendering, auth UI, approving recommendations
-- **Supabase Edge Functions** own everything long-running or scheduled: prompt generation, OpenAI batch calls, citation parsing, measurement re-runs — kept out of Next.js request/response cycle to avoid serverless timeout limits
+- **Supabase Edge Functions** own everything long-running or scheduled: prompt generation, AI engine batch calls, citation parsing, measurement re-runs — kept out of Next.js request/response cycle to avoid serverless timeout limits
 - **Postgres + RLS** is the single source of truth and the security boundary — even if application code has a bug, a company can never query another company's data
 
 ---
@@ -89,11 +89,11 @@ flowchart TB
 | Database | **Supabase Postgres** | Managed Postgres with built-in RLS, generous free tier, scales to dedicated instance later |
 | Auth | **Supabase Auth** | Email/password + OAuth (Google) out of the box; issues JWT consumed by RLS policies |
 | Backend Logic (short) | **Next.js Server Actions / Route Handlers** | CRUD operations, form submissions, approve/reject actions |
-| Backend Logic (long-running) | **Supabase Edge Functions (Deno)** | Prompt generation, OpenAI batch runs, citation parsing — anything that can exceed Next.js serverless timeout (10-60s depending on host) |
+| Backend Logic (long-running) | **Supabase Edge Functions (Deno)** | Prompt generation, AI engine batch runs, citation parsing — anything that can exceed Next.js serverless timeout (10-60s depending on host) |
 | Scheduled Jobs | **pg_cron (Supabase)** + Edge Function triggers | Weekly prompt re-runs, measurement scheduling |
 | File Storage | **Supabase Storage** | Exported PDF/CSV reports, cached raw response archives |
 | Realtime Updates | **Supabase Realtime (Postgres CDC)** | Live dashboard updates while analysis is running ("Generating prompts... Running analysis...") |
-| AI Integration | **OpenAI API (`openai` npm SDK)** | ChatGPT access for MVP engine |
+| AI Integration | **`openai` npm SDK against OpenAI-compatible APIs** | Grok (xAI, `https://api.x.ai/v1`) is the current engine; ChatGPT (OpenAI) switches on when its key is set. See Section 13 |
 | Email | **Resend** | Transactional emails (onboarding, weekly digest, action reminders) |
 | Monitoring | **Sentry** | Error tracking across Next.js + Edge Functions |
 | Hosting (Frontend) | **Vercel** | Native Next.js support, edge network, zero-config deploys |
@@ -156,7 +156,7 @@ neptune/
 │   ├── functions/                       # Edge Functions (Deno)
 │   │   ├── generate-prompts/            # Feature 1.1
 │   │   │   └── index.ts
-│   │   ├── run-chatgpt-batch/           # Feature 1.2
+│   │   ├── run-engine-batch/           # Feature 1.2
 │   │   │   └── index.ts
 │   │   ├── extract-citations/           # Feature 1.3
 │   │   │   └── index.ts
@@ -170,7 +170,7 @@ neptune/
 │   │   │   └index.ts
 │   │   ├── run-measurement/             # Feature 3.1
 │   │   │   └── index.ts
-│   │   └── _shared/                     # Shared Deno utilities (OpenAI client, CORS)
+│   │   └── _shared/                     # Shared Deno utilities (engine clients, pipeline logic)
 │   ├── seed.sql                         # Local dev seed data
 │   └── config.toml
 ├── .github/
@@ -180,7 +180,7 @@ neptune/
 └── package.json                         # Monorepo root (pnpm workspaces or Turborepo)
 ```
 
-**Why Edge Functions are split one-per-service:** mirrors the PRD's Feature numbering exactly (1.1 → `generate-prompts`, 1.2 → `run-chatgpt-batch`, etc.), so each function has a single responsibility, can be tested/deployed independently, and can be prompted to Claude Code in isolation without touching unrelated logic.
+**Why Edge Functions are split one-per-service:** mirrors the PRD's Feature numbering exactly (1.1 → `generate-prompts`, 1.2 → `run-engine-batch`, etc.), so each function has a single responsibility, can be tested/deployed independently, and can be prompted to Claude Code in isolation without touching unrelated logic.
 
 ---
 
@@ -443,7 +443,7 @@ create policy "Users can update own recommendations"
   using (company_id in (select id from public.companies where owner_id = auth.uid()));
 
 -- SERVICE ROLE: Edge Functions bypass RLS using the service_role key
--- (writes from generate-prompts, run-chatgpt-batch, etc. use service_role, never anon key)
+-- (writes from generate-prompts, run-engine-batch, etc. use service_role, never anon key)
 ```
 
 **Implemented migration (`supabase/migrations/20261001000000_initial_schema.sql`) hardens the policies above:** RLS is also enabled on `profiles` (self-read/update only, rows created by an `on_auth_user_created` trigger), every UPDATE policy has a matching `WITH CHECK` so a row can't be reassigned to another company, and child-table checks go through a `security definer` helper `owns_company(company_id)`. The migration is the source of truth for the exact SQL.
@@ -462,8 +462,8 @@ sequenceDiagram
     participant N as Next.js (Server Action)
     participant S as Supabase Postgres
     participant EF as Edge Function: generate-prompts
-    participant EF2 as Edge Function: run-chatgpt-batch
-    participant AI as OpenAI API
+    participant EF2 as Edge Function: run-engine-batch
+    participant AI as AI engines (Grok / ChatGPT)
 
     U->>N: Submit onboarding form
     N->>S: Insert company + competitors (service role)
@@ -472,12 +472,12 @@ sequenceDiagram
     EF->>AI: Generate 50+ prompts (LLM call)
     EF->>S: Bulk insert prompts
     EF-->>N: 200 OK {prompt_count: 52}
-    N->>EF2: Invoke run-chatgpt-batch(company_id)
+    N->>EF2: Invoke run-engine-batch(company_id)
     Note over EF2: Runs async, returns immediately
     EF2-->>N: 202 Accepted {job_id}
     N-->>U: Redirect to dashboard (status: analyzing)
     loop For each prompt
-        EF2->>AI: Run prompt through ChatGPT
+        EF2->>AI: Run prompt through each active engine
         EF2->>S: Insert response
     end
     S-->>U: Realtime update (Supabase Realtime channel)
@@ -492,7 +492,7 @@ sequenceDiagram
     participant N as Next.js
     participant S as Postgres
     participant EF as Edge Function: run-measurement
-    participant AI as OpenAI API
+    participant AI as AI engines (Grok / ChatGPT)
 
     U->>N: Approve recommendation
     N->>S: Update recommendation.status = 'approved'
@@ -515,17 +515,17 @@ sequenceDiagram
 | Edge Function | PRD Feature | Trigger | Timeout Risk Mitigation |
 |---------------|-------------|---------|--------------------------|
 | `generate-prompts` | 1.1 | Server Action on onboarding submit | Single LLM call, fast (<30s) |
-| `run-chatgpt-batch` | 1.2 | Invoked after prompts generated; also weekly via pg_cron | Fire-and-forget pattern: Edge Function queues individual prompt runs rather than awaiting all 50 synchronously; processes in batches of 5-10 with `Promise.allSettled` |
+| `run-engine-batch` | 1.2 | Invoked after prompts generated; also weekly via pg_cron | Fire-and-forget pattern: Edge Function queues individual prompt runs rather than awaiting all 50 synchronously; processes in batches of 5-10 with `Promise.allSettled` |
 | `extract-citations` | 1.3 | Triggered per-response via Postgres trigger/webhook after insert | Runs per-response (small payload), not batched — avoids timeout entirely |
 | `analyze-competitors` | 1.4 | Invoked after all citations extracted for a batch | Aggregation query, fast |
 | `analyze-gaps` | 1.5 | Invoked after competitor analysis completes | Depends on manual Google rank input (MVP) — no external API call, fast |
 | `map-content-gaps` | 1.6 | Invoked after gap analysis | Includes a site crawl step (sitemap fetch) — kept separate so a slow crawl doesn't block gap analysis |
 | `generate-recommendations` | 2.1 | Invoked after content gap mapping | LLM call per gap batch; chunked to stay under timeout |
-| `run-measurement` | 3.1 | pg_cron (checks daily for due re-measurements) + manual trigger | Same batching pattern as `run-chatgpt-batch` |
+| `run-measurement` | 3.1 | pg_cron (checks daily for due re-measurements) + manual trigger | Same batching pattern as `run-engine-batch` |
 
-**Batching pattern (used in `run-chatgpt-batch` and `run-measurement`):**
+**Batching pattern (used in `run-engine-batch` and `run-measurement`):**
 ```typescript
-// supabase/functions/run-chatgpt-batch/index.ts (excerpt)
+// supabase/functions/run-engine-batch/index.ts (excerpt)
 const BATCH_SIZE = 8;
 for (let i = 0; i < prompts.length; i += BATCH_SIZE) {
   const batch = prompts.slice(i, i + BATCH_SIZE);
@@ -576,7 +576,7 @@ const channel = supabase
   .subscribe();
 ```
 
-This replaces polling — the dashboard shows "Analyzing... 23/52 prompts complete" live as `run-chatgpt-batch` inserts rows, with zero extra API calls from the client.
+This replaces polling — the dashboard shows "Analyzing... 23/52 prompts complete" live as `run-engine-batch` inserts rows, with zero extra API calls from the client.
 
 ---
 
@@ -589,7 +589,7 @@ select cron.schedule(
   '0 6 * * 1',  -- Every Monday 6am UTC
   $$
     select net.http_post(
-      url := 'https://<project-ref>.supabase.co/functions/v1/run-chatgpt-batch',
+      url := 'https://<project-ref>.supabase.co/functions/v1/run-engine-batch',
       headers := '{"Authorization": "Bearer <service_role_key>"}'::jsonb,
       body := jsonb_build_object('trigger', 'scheduled_weekly')
     );
@@ -633,9 +633,9 @@ Most reads (dashboard data) happen directly via **Supabase client in Server Comp
 |---------|-----------|
 | Cross-company data leakage | RLS on every table, tested with automated policy tests (Section 14) |
 | `service_role` key exposure | Only used server-side in Edge Functions and trusted Server Actions; never sent to client bundle |
-| OpenAI API key exposure | Stored as Supabase Edge Function secret, never in Next.js client env vars |
+| AI engine API key exposure (xAI, OpenAI) | Stored as Supabase Edge Function secrets, never in Next.js client env vars |
 | Prompt injection via competitor content | Citation parser (Feature 1.3) treats all AI response text as untrusted data — never fed back into further LLM calls without sanitization |
-| Rate limiting | Next.js middleware rate-limits onboarding/analysis triggers per user; OpenAI usage capped via monthly budget alert |
+| Rate limiting | Next.js middleware rate-limits onboarding/analysis triggers per user; AI engine usage capped via monthly budget alerts (xAI and OpenAI consoles) |
 | SQL injection | Eliminated by using Supabase client/PostgREST parameterized queries — no raw string SQL concatenation anywhere in app code |
 
 ---
@@ -658,7 +658,7 @@ supabase functions serve          # Run Edge Functions locally
 # Deploy
 supabase db push --linked         # Push migrations to linked remote project
 supabase functions deploy generate-prompts
-supabase functions deploy run-chatgpt-batch
+supabase functions deploy run-engine-batch
 # ... repeat per function, or deploy all via CI script
 
 vercel --prod                     # Or auto-deploy via GitHub integration
@@ -676,7 +676,9 @@ NEXT_PUBLIC_SITE_URL=             # canonical/sitemap/OG base URL
 
 **Supabase Edge Function Secrets** (set via `supabase secrets set`):
 ```
-OPENAI_API_KEY=
+XAI_API_KEY=                      # Grok — active when set (current engine)
+XAI_MODEL=grok-4.3                # optional; grok-4.7 is the flagship
+OPENAI_API_KEY=                   # ChatGPT — switches on automatically when set
 OPENAI_MODEL=gpt-4-turbo
 PIPELINE_SECRET=                  # same value as Next.js; also stored in Vault as 'pipeline_secret'
 RESEND_API_KEY=
@@ -685,9 +687,12 @@ SLACK_WEBHOOK_URL=
 
 ### Implementation notes (as built)
 - **Pipeline auth:** the 8 pipeline Edge Functions run with `verify_jwt = false` and require `Authorization: Bearer <PIPELINE_SECRET>` (constant-time check in `supabase/functions/_shared/runtime.ts`). Callers: Next.js server actions (`lib/pipeline.ts`), pg_cron (secret read from Vault), and the functions themselves when chaining. Users can't invoke them directly. Inside, functions use the auto-provided `SUPABASE_SERVICE_ROLE_KEY`.
-- **Chaining:** each step replies `202` and works in `EdgeRuntime.waitUntil`, then calls the next: `generate-prompts → run-chatgpt-batch (self-re-invokes per 24 prompts) → extract-citations → analyze-competitors → analyze-gaps → map-content-gaps → generate-recommendations` (marks the `measurement_runs` round completed). `run-measurement` starts a new round 14 days after an action is implemented.
+- **Chaining:** each step replies `202` and works in `EdgeRuntime.waitUntil`, then calls the next: `generate-prompts → run-engine-batch (self-re-invokes per 24 prompts) → extract-citations → analyze-competitors → analyze-gaps → map-content-gaps → generate-recommendations` (marks the `measurement_runs` round completed). `run-measurement` starts a new round 14 days after an action is implemented.
 - **Pure logic** lives in `supabase/functions/_shared/{extract,score,gaps,recommend,prompts}.ts` and is unit-tested: `npx deno test supabase/functions/_shared/`.
-- **API surface changes vs. Section 11:** manual re-analysis is the `rerunAnalysis` server action (1-hour cooldown) instead of `POST /api/analyze`; Google ranks are saved via `saveGoogleRanks` (then `analyze-gaps` re-runs, no ChatGPT cost); `GET /api/companies/[id]/export` returns CSV (PDF via browser print).
+- **API surface changes vs. Section 11:** manual re-analysis is the `rerunAnalysis` server action (1-hour cooldown) instead of `POST /api/analyze`; Google ranks are saved via `saveGoogleRanks` (then `analyze-gaps` re-runs, no AI engine cost); `GET /api/companies/[id]/export` returns CSV (PDF via browser print).
+- **Multiple AI engines** (migration `20261001000200`): `_shared/engines.ts` lists the engines; one is active when its key is set (`XAI_API_KEY` → Grok, `OPENAI_API_KEY` → ChatGPT). `run-engine-batch` (renamed from `run-chatgpt-batch`) asks every active engine each prompt; an engine whose every call in a batch fails is dropped for the rest of the round instead of failing it. Metrics are stored **per engine** in `measurement_runs.engine_metrics` (`{ "<engine>": { brand_citations_count, brand_recommendation_count, citation_share, recommendation_share, competitor_snapshot, confidence_level, answers } }`), which replaces the single-engine metric columns, and an engine's baseline is the first round it was measured in. Gaps are detected per engine, then merged: the same gap on several engines becomes one row with `gaps.engines` listing them, and its priority scores are added together. The dashboard shows one engine at a time (`?engine=`), with tabs once a second engine has data. Prompt generation uses the first active engine.
+- **Dashboard sections** (match the marketing preview; one menu definition in `apps/web/components/dashboard/nav.ts` feeds both): Overview, AI Answers (`/answers`), Queries (`/queries`, incl. Google ranks), Brand Mentions (`/mentions`, tracked brands + cited websites), Competitors (`/competitors`), Opportunities (`/opportunities` = gaps + recommendations workflow), Reports (`/reports` = before/after + CSV/PDF), Settings (editable company, competitors, account, plan). Old `/gaps`, `/recommendations`, `/results` redirect (next.config). AI answers render as Markdown via `react-markdown` (no raw HTML, images stripped).
+- **Plans** (migration `20261001000400`): 14-day trial then $29/month or $290/year, invoiced manually. `companies.trial_ends_at` / `plan` / `paid_until` are readable but not user-writable (no column update grant). A company may start analyses while `trial_ends_at` or `paid_until` is in the future — enforced in `startRound()` (pipeline, incl. weekly cron) and `rerunAnalysis` (dashboard). To activate a paid customer: set `plan` and `paid_until` in the Supabase Table Editor.
 - **Schema additions** (migration `20261001000100`): `prompts.google_rank`, column-level `UPDATE` grants (users can only change workflow fields), unique `(prompt_id, measurement_round, engine)` on `responses`, Realtime on `prompts`/`measurement_runs`, and pg_cron schedules reading secrets from Vault.
 
 ---
@@ -697,7 +702,7 @@ SLACK_WEBHOOK_URL=
 | Layer | Approach |
 |-------|----------|
 | RLS Policies | `pgTAP` or Supabase's policy testing via SQL scripts run in CI — assert user A cannot select user B's company rows |
-| Edge Functions | Deno's built-in test runner; mock OpenAI responses for citation parser tests |
+| Edge Functions | Deno's built-in test runner; mock AI engine responses for citation parser tests |
 | Server Actions | Vitest + mocked Supabase client |
 | Component/UI | React Testing Library for dashboard components (recommendation approval flow, gap cards) |
 | End-to-End | Playwright — full onboarding → analysis → recommendation → measurement flow against a seeded test Supabase project |
@@ -708,9 +713,9 @@ SLACK_WEBHOOK_URL=
 
 | Trigger | Change |
 |---------|--------|
-| >100 companies with weekly re-runs | Move `run-chatgpt-batch` from Edge Functions to a dedicated queue (Supabase Queues or external like Trigger.dev) to avoid Edge Function concurrency limits |
+| >100 companies with weekly re-runs | Move `run-engine-batch` from Edge Functions to a dedicated queue (Supabase Queues or external like Trigger.dev) to avoid Edge Function concurrency limits |
 | Citation parsing accuracy plateau | Replace regex/LLM-hybrid parser with a fine-tuned extraction model or dedicated NLP service |
-| Multi-engine expansion (Perplexity, Gemini, etc.) | Add `engine` variants to `run-chatgpt-batch` pattern as parallel Edge Functions sharing the same `responses` table schema (already supports it via `engine` column) |
+| More engines (Perplexity, Gemini, etc.) | Add the engine to `ENGINES` in `_shared/types.ts` and `_shared/engines.ts` (any OpenAI-compatible API is config only), allow it in the `responses.engine` check constraint, and add a label in `apps/web/lib/insights.ts` |
 | Postgres approaching compute limits | Upgrade Supabase compute tier; consider read replicas for dashboard-heavy read queries |
 | Multi-seat team accounts | Introduce `company_members` join table, update RLS policies (see note in Section 5.3) |
 
@@ -722,7 +727,8 @@ SLACK_WEBHOOK_URL=
 |----------|------------------------|------------------|
 | Supabase Edge Functions over a separate FastAPI backend | Python/FastAPI (original PRD draft) | Single platform (Supabase) for DB + Auth + Functions reduces infra surface area; Deno/TypeScript keeps one language across frontend and backend logic |
 | pg_cron over external scheduler (e.g., GitHub Actions cron) | Vercel Cron, external queue service | Keeps scheduling co-located with the data it operates on; no extra service to manage for MVP scale |
-| Denormalized `competitor_snapshot` JSONB on `measurement_runs` | Fully normalized per-competitor measurement rows | Before/after comparison reads are the most frequent dashboard query — denormalizing avoids expensive joins at read time, matches the "traceability over normalization" principle in Section 1 |
+| Denormalized per-engine metrics (incl. `competitor_snapshot`) in `measurement_runs.engine_metrics` JSONB | Fully normalized per-competitor measurement rows | Before/after comparison reads are the most frequent dashboard query — denormalizing avoids expensive joins at read time, matches the "traceability over normalization" principle in Section 1 |
+| Engines switched on by API key, metrics never mixed across engines | One combined score; one Edge Function per engine | Answers differ by engine, so a blended score would hide where you're winning or losing. Config-driven engines mean ChatGPT goes live with a secret, not a deploy |
 | RLS as primary security boundary | App-layer-only authorization | Supabase exposes Postgres directly to the client (PostgREST) — app-layer checks alone would be insufficient |
 
 ---

@@ -35,7 +35,7 @@ export async function setRecommendationStatus(id: string, next: RecStatus, notes
     .eq("id", id);
   if (error) return { error: "Couldn't update. Please try again." };
 
-  revalidatePath("/recommendations");
+  revalidatePath("/opportunities");
   revalidatePath("/overview");
   return {};
 }

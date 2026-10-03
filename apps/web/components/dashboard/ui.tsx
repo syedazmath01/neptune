@@ -2,6 +2,8 @@
 
 import { animate, motion, useInView, useMotionValue, useTransform } from "motion/react";
 import { useEffect, useRef } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -107,5 +109,47 @@ export function PrintButton() {
     <button onClick={() => window.print()} className="glass flex min-h-11 items-center rounded-full px-5 font-semibold text-ink">
       Print / Save PDF
     </button>
+  );
+}
+
+/** Recommended / Mentioned / Missing for one AI answer. */
+export function PresenceBadge({ recommended, mentioned }: { recommended: boolean; mentioned: boolean }) {
+  return (
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        recommended ? "bg-success/15 text-success" : mentioned ? "bg-severity-medium/15 text-severity-medium" : "bg-danger/10 text-danger"
+      }`}
+    >
+      {recommended ? "Recommended" : mentioned ? "Mentioned" : "Missing"}
+    </span>
+  );
+}
+
+/** Horizontal bar: value out of max. */
+export function Meter({ value, max, tone = "forest" }: { value: number; max: number; tone?: "forest" | "terracotta" }) {
+  const width = max ? Math.max(value ? 3 : 0, Math.round((value / max) * 100)) : 0;
+  return (
+    <span className="block h-2 w-full overflow-hidden rounded-full bg-cream-200" role="presentation">
+      <motion.span
+        className={`block h-full rounded-full ${tone === "forest" ? "bg-forest-600" : "bg-terracotta-500"}`}
+        initial={{ width: 0 }}
+        animate={{ width: `${width}%` }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      />
+    </span>
+  );
+}
+
+/** Card title with a "see all" link on the right. */
+export function CardHeader({ title, href, link }: { title: string; href?: string; link?: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="font-semibold text-ink">{title}</h2>
+      {href && link && (
+        <Link href={href} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-forest-700">
+          {link} <ArrowRight size={14} />
+        </Link>
+      )}
+    </div>
   );
 }

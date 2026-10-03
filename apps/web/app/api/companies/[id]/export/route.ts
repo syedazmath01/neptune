@@ -8,7 +8,7 @@ function cell(v: unknown): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) return new Response("Not found", { status: 404 });
 
@@ -22,10 +22,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const { data: company } = await supabase.from("companies").select("id, domain").eq("id", id).maybeSingle();
   if (!company) return new Response("Not found", { status: 404 });
 
-  const last = (await loadRuns(supabase, company.id)).filter((r) => r.status === "completed").at(-1);
+  const { runs, engine } = await loadRuns(supabase, company.id, new URL(req.url).searchParams.get("engine") ?? undefined);
+  const last = runs.filter((r) => r.status === "completed" && r.measured).at(-1);
   if (!last) return new Response("No completed analysis yet", { status: 404 });
 
-  const rows = await loadBreakdown(supabase, company.id, last.round_number);
+  const rows = await loadBreakdown(supabase, company.id, last.round_number, engine);
   const csv = [
     ["Prompt", "Category", "Google rank", "You mentioned", "You recommended", "Competitors recommended", "Brands in answer"],
     ...rows.map((p) => [
@@ -44,7 +45,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   return new Response("﻿" + csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="neptune-${company.domain}-round-${last.round_number}.csv"`,
+      "Content-Disposition": `attachment; filename="neptune-${company.domain}-${engine}-round-${last.round_number}.csv"`,
       "Cache-Control": "private, no-store",
     },
   });

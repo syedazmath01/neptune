@@ -10,7 +10,7 @@ export function RanksForm({ prompts }: { prompts: { id: string; text: string; go
     <form action={action} className="mt-4">
       <p className="text-sm text-muted">
         Enter where your site ranks on Google for each question (1–100, leave blank if you don&apos;t rank). Gaps where you rank well
-        on Google but are missing from ChatGPT get the highest priority.
+        on Google but are missing from AI answers get the highest priority.
       </p>
       <ul className="mt-4 max-h-96 divide-y divide-line overflow-y-auto pr-1">
         {prompts.map((p) => (
