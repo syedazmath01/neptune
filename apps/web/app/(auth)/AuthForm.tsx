@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { login, resendConfirmation, signup, type AuthState } from "./actions";
 import { createClient } from "@/lib/supabase/client";
 
-export function AuthForm({ mode, next }: { mode: "login" | "signup"; next?: string }) {
+export function AuthForm({ mode, next, notice }: { mode: "login" | "signup"; next?: string; notice?: string }) {
   const [state, action, pending] = useActionState<AuthState, FormData>(
     mode === "login" ? login : signup,
     {},
@@ -58,6 +58,10 @@ export function AuthForm({ mode, next }: { mode: "login" | "signup"; next?: stri
         </>
       ) : (
         <div className="mt-6" />
+      )}
+
+      {notice && !state.error && !state.message && (
+        <p className="mb-4 rounded-lg bg-forest-500/10 px-3 py-2 text-sm text-forest-800" role="status">{notice}</p>
       )}
 
       <form action={action} className="space-y-4">

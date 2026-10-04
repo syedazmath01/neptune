@@ -366,7 +366,7 @@ export default function Home() {
               ))}
             </div>
             <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted">
-              Before your trial ends we&apos;ll email you to choose monthly or yearly, and send an invoice. Your data stays in your account either way.
+              Your dashboard shows how many trial days are left. Choose monthly or yearly whenever you&apos;re ready and we&apos;ll send an invoice. Your data stays in your account either way.
             </p>
           </div>
         </section>

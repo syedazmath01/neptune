@@ -25,6 +25,23 @@ export function TopBar({ company, name, email }: { company: PlanFields & { name:
         <ProfileMenu name={name} email={email} />
       </div>
 
+      {s.active && !s.paid && s.trialDaysLeft <= 3 && (
+        <div className="mb-8 rounded-2xl border border-severity-medium/40 bg-severity-medium/10 p-5">
+          <p className="font-semibold text-ink">
+            Your free trial ends {s.trialDaysLeft <= 1 ? "within a day" : `in ${s.trialDaysLeft} days`}.
+          </p>
+          <p className="mt-1 text-sm text-ink">Choose a plan to keep new analyses running. Your results stay available either way.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={upgradeHref(company.name, "monthly")} className="inline-flex min-h-11 items-center rounded-full bg-forest-800 px-5 text-sm font-semibold text-cream-50">
+              Monthly · ${PRICE.monthly}/month
+            </a>
+            <a href={upgradeHref(company.name, "yearly")} className="glass inline-flex min-h-11 items-center rounded-full px-5 text-sm font-semibold text-ink">
+              Yearly · ${PRICE.yearly}/year (2 months free)
+            </a>
+          </div>
+        </div>
+      )}
+
       {!s.active && (
         <div className="mb-8 rounded-2xl border border-danger/30 bg-danger/10 p-5">
           <p className="font-semibold text-danger">Your free trial has ended — new analyses are paused.</p>
